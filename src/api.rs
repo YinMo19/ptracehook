@@ -124,6 +124,19 @@ pub struct SessionBuilder {
 }
 
 impl SessionBuilder {
+    /// Creates a builder that launches a new tracee process.
+    ///
+    /// The process will be started with `PTRACE_TRACEME` and then controlled by
+    /// [`TraceSession::run`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let builder = SessionBuilder::spawn("./target_app");
+    /// let _session = builder.build();
+    /// ```
     pub fn spawn(path: impl Into<PathBuf>) -> Self {
         Self {
             launch: LaunchKind::Spawn {
@@ -134,6 +147,19 @@ impl SessionBuilder {
         }
     }
 
+    /// Creates a builder that attaches to an existing process.
+    ///
+    /// The target process must be attachable by ptrace (permissions, Yama policy,
+    /// and process state all apply).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let pid = 12345;
+    /// let _session = SessionBuilder::attach(pid).build();
+    /// ```
     pub fn attach(pid: Pid) -> Self {
         Self {
             launch: LaunchKind::Attach { pid },
@@ -141,6 +167,21 @@ impl SessionBuilder {
         }
     }
 
+    /// Appends one argument for spawn mode.
+    ///
+    /// This method has effect only when the builder is in spawn mode; calling it
+    /// on an attach builder keeps the builder unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let _session = SessionBuilder::spawn("./target_app")
+    ///     .arg("hello")
+    ///     .arg("world")
+    ///     .build();
+    /// ```
     pub fn arg(mut self, arg: impl Into<OsString>) -> Self {
         if let LaunchKind::Spawn { args, .. } = &mut self.launch {
             args.push(arg.into());
@@ -148,6 +189,20 @@ impl SessionBuilder {
         self
     }
 
+    /// Appends multiple arguments for spawn mode.
+    ///
+    /// This method has effect only when the builder is in spawn mode; calling it
+    /// on an attach builder keeps the builder unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let _session = SessionBuilder::spawn("./target_app")
+    ///     .args(["--mode", "demo", "--count", "3"])
+    ///     .build();
+    /// ```
     pub fn args<I, S>(mut self, args: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -162,11 +217,47 @@ impl SessionBuilder {
         self
     }
 
+    /// Overrides session options.
+    ///
+    /// You can use this to change defaults such as `PTRACE_O_EXITKILL` behavior
+    /// and non-trap signal forwarding policy.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{SessionBuilder, SessionOptions};
+    ///
+    /// let options = SessionOptions {
+    ///     exit_kill: true,
+    ///     pass_through_non_trap_signals: false,
+    /// };
+    ///
+    /// let _session = SessionBuilder::spawn("./target_app")
+    ///     .options(options)
+    ///     .build();
+    /// ```
     pub fn options(mut self, options: SessionOptions) -> Self {
         self.options = options;
         self
     }
 
+    /// Builds a [`TraceSession`] from the current builder configuration.
+    ///
+    /// Performs lightweight validation:
+    /// - spawn path must not be empty,
+    /// - attach pid must be positive,
+    /// - current platform must be supported by this crate.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let session = SessionBuilder::spawn("./target_app")
+    ///     .args(["1", "2"])
+    ///     .build()?;
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn build(self) -> Result<TraceSession, PtraceHookError> {
         match &self.launch {
             LaunchKind::Spawn { path, .. } => {
@@ -272,6 +363,36 @@ impl fmt::Debug for TraceSession {
 }
 
 impl TraceSession {
+    /// Registers a software breakpoint with callback handler.
+    ///
+    /// Returns a unique [`BreakpointId`] that can be used later with
+    /// [`TraceSession::remove_breakpoint`].
+    ///
+    /// If the session is already running, the breakpoint is installed
+    /// immediately into the traced process.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{BreakpointMode, BreakpointSpec, HookAction, SessionBuilder};
+    ///
+    /// let mut session = SessionBuilder::spawn("./target_app").build()?;
+    ///
+    /// let bp_id = session.add_breakpoint(
+    ///     BreakpointSpec {
+    ///         address: 0x401000,
+    ///         mode: BreakpointMode::ExecuteOriginal,
+    ///         name: Some("entry".to_string()),
+    ///     },
+    ///     Box::new(|ctx| {
+    ///         ctx.regs.rax = 42;
+    ///         Ok(HookAction::Continue)
+    ///     }),
+    /// )?;
+    ///
+    /// let _ = bp_id;
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn add_breakpoint(
         &mut self,
         spec: BreakpointSpec,
@@ -341,6 +462,29 @@ impl TraceSession {
         Ok(id)
     }
 
+    /// Removes a previously registered breakpoint.
+    ///
+    /// If the breakpoint is currently installed in the tracee, this call attempts
+    /// to restore original instruction bytes before removing internal state.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{BreakpointMode, BreakpointSpec, HookAction, SessionBuilder};
+    ///
+    /// let mut session = SessionBuilder::spawn("./target_app").build()?;
+    /// let id = session.add_breakpoint(
+    ///     BreakpointSpec {
+    ///         address: 0x401000,
+    ///         mode: BreakpointMode::SkipOriginal,
+    ///         name: None,
+    ///     },
+    ///     Box::new(|_| Ok(HookAction::Continue)),
+    /// )?;
+    ///
+    /// session.remove_breakpoint(id)?;
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn remove_breakpoint(&mut self, id: BreakpointId) -> Result<(), PtraceHookError> {
         let entry = self
             .breakpoints_by_id
@@ -384,6 +528,30 @@ impl TraceSession {
         Ok(())
     }
 
+    /// Starts the tracing event loop.
+    ///
+    /// This method consumes ptrace stop events until one of the following occurs:
+    /// process exit, signal termination, detach, or forced kill.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{SessionBuilder, TraceExit};
+    ///
+    /// let mut session = SessionBuilder::spawn("./target_app")
+    ///     .args(["1", "2"])
+    ///     .build()?;
+    ///
+    /// match session.run()? {
+    ///     TraceExit::Exited(code) => {
+    ///         println!("tracee exited with code {code}");
+    ///     }
+    ///     other => {
+    ///         println!("trace finished with {other:?}");
+    ///     }
+    /// }
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn run(&mut self) -> Result<TraceExit, PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
@@ -404,6 +572,22 @@ impl TraceSession {
         }
     }
 
+    /// Reads raw bytes from the tracee address space.
+    ///
+    /// The session must currently have a traced pid (for example during active
+    /// tracing or after a successful attach).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{RegistersX86_64, SessionBuilder};
+    ///
+    /// let mut session = SessionBuilder::attach(12345).build()?;
+    /// let regs: RegistersX86_64 = session.get_regs()?;
+    /// let bytes = session.read_bytes(regs.rip, 16)?;
+    /// println!("read {} bytes", bytes.len());
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn read_bytes(&mut self, remote_addr: u64, len: usize) -> Result<Vec<u8>, PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
@@ -433,6 +617,22 @@ impl TraceSession {
         }
     }
 
+    /// Writes raw bytes into the tracee address space.
+    ///
+    /// The write is performed with ptrace word-sized merge logic so unaligned
+    /// ranges are supported.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::{RegistersX86_64, SessionBuilder};
+    ///
+    /// let mut session = SessionBuilder::attach(12345).build()?;
+    /// let regs: RegistersX86_64 = session.get_regs()?;
+    /// let original = session.read_bytes(regs.rip, 4)?;
+    /// session.write_bytes(regs.rip, &original)?;
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn write_bytes(&mut self, remote_addr: u64, data: &[u8]) -> Result<(), PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
@@ -462,6 +662,21 @@ impl TraceSession {
         }
     }
 
+    /// Reads general-purpose register state from the tracee.
+    ///
+    /// The returned structure keeps the existing `RegistersX86_64` API shape for
+    /// compatibility; on `aarch64` fields are mapped to equivalent roles.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let mut session = SessionBuilder::attach(12345).build()?;
+    /// let regs = session.get_regs()?;
+    /// println!("pc/rip = 0x{:x}", regs.rip);
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn get_regs(&mut self) -> Result<RegistersX86_64, PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
@@ -492,6 +707,22 @@ impl TraceSession {
         }
     }
 
+    /// Writes general-purpose register state to the tracee.
+    ///
+    /// This method updates the architecture-specific raw register set by mapping
+    /// from [`RegistersX86_64`] compatibility fields.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ptracehook::SessionBuilder;
+    ///
+    /// let mut session = SessionBuilder::attach(12345).build()?;
+    /// let mut regs = session.get_regs()?;
+    /// regs.rax = 1337;
+    /// session.set_regs(&regs)?;
+    /// # Ok::<(), ptracehook::PtraceHookError>(())
+    /// ```
     pub fn set_regs(&mut self, regs: &RegistersX86_64) -> Result<(), PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
