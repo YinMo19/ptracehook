@@ -1,6 +1,6 @@
 [package]
 name = "ptracehook"
-version = "0.1.0-alpha.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Out-of-process ptrace hook framework for Linux (x86_64/aarch64 runtime)"

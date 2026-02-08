@@ -2,7 +2,7 @@
 
 `ptracehook` is an out-of-process runtime hook framework for Linux targets.
 
-Current release line (`0.1.0-alpha.x`) supports both Linux architectures:
+Current release line (`0.2.x`) supports both Linux architectures:
 
 - Linux `x86_64`: usable runtime implementation (spawn/attach + software breakpoints + callbacks)
 - Linux `aarch64`: usable runtime implementation (spawn/attach + software breakpoints + callbacks)
@@ -11,7 +11,7 @@ Unlike in-process signal/trap hook crates, `ptracehook` is designed for scenario
 
 ## Current status
 
-- Public API surface is drafted and Linux runtime core is partially implemented.
+- Public API is stable for the current release line and Linux runtime core is implemented.
 - Linux `x86_64` now includes:
   - spawn/attach session flow,
   - software breakpoint install/restore/reinsert loop,
