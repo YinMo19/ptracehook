@@ -1,11 +1,13 @@
 [package]
 name = "ptracehook"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2024"
 rust-version = "1.85"
-description = "Out-of-process ptrace-based hook framework scaffold"
+description = "Out-of-process ptrace hook framework for Linux (x86_64 runtime, aarch64 backend in progress)"
 license = "MIT"
 repository = "https://github.com/YinMo19/ptracehook"
+homepage = "https://github.com/YinMo19"
+documentation = "https://docs.rs/ptracehook"
 
 [dependencies]
 libc = "0.2"

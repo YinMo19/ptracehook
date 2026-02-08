@@ -1,6 +1,11 @@
 # ptracehook
 
-`ptracehook` is a planned out-of-process runtime hook framework for Linux `x86_64` targets.
+`ptracehook` is an out-of-process runtime hook framework for Linux targets.
+
+Current release line (`0.1.0-alpha.x`) is **x86_64-first**:
+
+- Linux `x86_64`: usable runtime implementation (spawn/attach + software breakpoints + callbacks)
+- Linux `aarch64`: API/build surface present, runtime backend in progress
 
 Unlike in-process signal/trap hook crates, `ptracehook` is designed for scenarios where preload-based injection is unavailable (for example, statically linked executables).
 
