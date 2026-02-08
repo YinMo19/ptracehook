@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  rust-checks:
+  rust-linux-x86_64:
     runs-on: ubuntu-24.04
 
     steps:
@@ -16,8 +16,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-unknown-linux-gnu
-        with:
+          targets: x86_64-unknown-linux-gnu
           components: rustfmt, clippy
 
       - name: Setup Rust cache
@@ -27,16 +26,31 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Cargo check
-        run: cargo check --all-targets
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
 
       - name: Cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
 
-      - name: Cargo test (unit + integration)
-        run: cargo test --all-targets
+      - name: Cargo test
+        run: cargo test --all-targets --target x86_64-unknown-linux-gnu
 
-  zigbuild-linux-targets:
-    runs-on: ubuntu-24.04
+      - name: Run x86_64 smoke examples
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cc -O0 -fno-omit-frame-pointer -fno-inline -no-pie examples/instrument_with_original/target.c -o examples/instrument_with_original/app
+          OUT=$(cargo run --quiet --example instrument_with_original)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(1, 2) = 42"* ]]
+
+          cc -O0 -fno-omit-frame-pointer -fno-inline -no-pie examples/instrument_no_original/target.c -o examples/instrument_no_original/app
+          OUT=$(cargo run --quiet --example instrument_no_original)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(4, 5) = 99"* ]]
+
+  rust-linux-aarch64:
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
@@ -44,17 +58,21 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.13.0
+          targets: aarch64-unknown-linux-gnu
+          components: clippy
 
-      - name: Install cargo-zigbuild
-        run: cargo install cargo-zigbuild --locked
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
 
-      - name: Zigbuild x86_64 Linux
-        run: cargo zigbuild --target x86_64-unknown-linux-gnu
+      - name: Cargo check
+        run: cargo check --all-targets --target aarch64-unknown-linux-gnu
 
-      - name: Zigbuild aarch64 Linux
-        run: cargo zigbuild --target aarch64-unknown-linux-gnu
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --target aarch64-unknown-linux-gnu -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --all-targets --target aarch64-unknown-linux-gnu
+
+      - name: Build examples (aarch64)
+        run: cargo build --examples --target aarch64-unknown-linux-gnu

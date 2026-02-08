@@ -37,7 +37,9 @@ cargo run --example instrument_with_original
 
 CI workflow is at `.github/workflows/ci.yml` and currently includes:
 
-- fmt/check/clippy/test on `ubuntu-24.04`
-- `cargo zigbuild` cross compile checks for:
-  - `x86_64-unknown-linux-gnu`
-  - `aarch64-unknown-linux-gnu`
+- native Linux `x86_64` job on `ubuntu-24.04`:
+  - fmt/check/clippy/test
+  - runtime smoke examples
+- native Linux `aarch64` job on `ubuntu-24.04-arm`:
+  - check/clippy/test
+  - examples build
