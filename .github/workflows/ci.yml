@@ -77,18 +77,17 @@ jobs:
       - name: Build examples (aarch64)
         run: cargo build --examples --target aarch64-unknown-linux-gnu
 
-      - name: Run aarch64 example smoke (expected backend TODO)
+      - name: Run aarch64 smoke examples
         shell: bash
         run: |
           set -euo pipefail
 
           cc -O0 -fno-omit-frame-pointer -fno-inline -no-pie examples/instrument_with_original/target.c -o examples/instrument_with_original/app
-
-          set +e
-          OUT=$(cargo run --example instrument_with_original 2>&1)
-          CODE=$?
-          set -e
-
+          OUT=$(cargo run --quiet --example instrument_with_original)
           echo "$OUT"
-          [[ $CODE -ne 0 ]]
-          [[ "$OUT" == *"NotImplemented(\"linux aarch64 backend is planned but not implemented yet\")"* ]]
+          [[ "$OUT" == *"calc(1, 2) = 42"* ]]
+
+          cc -O0 -fno-omit-frame-pointer -fno-inline -no-pie examples/instrument_no_original/target.c -o examples/instrument_no_original/app
+          OUT=$(cargo run --quiet --example instrument_no_original)
+          echo "$OUT"
+          [[ "$OUT" == *"calc(4, 5) = 99"* ]]

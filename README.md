@@ -2,10 +2,10 @@
 
 `ptracehook` is an out-of-process runtime hook framework for Linux targets.
 
-Current release line (`0.1.0-alpha.x`) is **x86_64-first**:
+Current release line (`0.1.0-alpha.x`) supports both Linux architectures:
 
 - Linux `x86_64`: usable runtime implementation (spawn/attach + software breakpoints + callbacks)
-- Linux `aarch64`: API/build surface present, runtime backend in progress
+- Linux `aarch64`: usable runtime implementation (spawn/attach + software breakpoints + callbacks)
 
 Unlike in-process signal/trap hook crates, `ptracehook` is designed for scenarios where preload-based injection is unavailable (for example, statically linked executables).
 
@@ -18,12 +18,12 @@ Unlike in-process signal/trap hook crates, `ptracehook` is designed for scenario
   - callback-based hook dispatch,
   - register get/set,
   - remote memory read/write helpers.
-- Linux `aarch64` target is accepted at build level, but runtime backend remains TODO.
+- Linux `aarch64` runtime now includes the same core flow as `x86_64` (spawn/attach, breakpoints, callbacks, register/memory helpers).
 - Detailed implementation plan and API contract are documented in `AGENT.md`.
 
 ## Scope
 
-- Primary MVP target: `linux x86_64`
+- Primary MVP targets: `linux x86_64` and `linux aarch64`
 - Primary runtime primitive: `ptrace` (`PTRACE_TRACEME` / `PTRACE_ATTACH` / breakpoint + single-step loop)
 
 ## Examples
@@ -31,7 +31,7 @@ Unlike in-process signal/trap hook crates, `ptracehook` is designed for scenario
 - `examples/instrument_with_original`
 - `examples/instrument_no_original`
 
-Example quick run (Linux `x86_64`):
+Example quick run (Linux `x86_64` / `aarch64`):
 
 ```bash
 cc -O0 -fno-omit-frame-pointer -no-pie examples/instrument_with_original/target.c -o examples/instrument_with_original/app
@@ -48,3 +48,4 @@ CI workflow is at `.github/workflows/ci.yml` and currently includes:
 - native Linux `aarch64` job on `ubuntu-24.04-arm`:
   - check/clippy/test
   - examples build
+  - runtime smoke examples
