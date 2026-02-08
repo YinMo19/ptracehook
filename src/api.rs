@@ -323,14 +323,14 @@ impl TraceSession {
     pub fn run(&mut self) -> Result<TraceExit, PtraceHookError> {
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         {
-            return self.run_linux_x86_64();
+            self.run_linux_x86_64()
         }
 
         #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
         {
-            return Err(PtraceHookError::NotImplemented(
+            Err(PtraceHookError::NotImplemented(
                 "linux aarch64 backend is planned but not implemented yet",
-            ));
+            ))
         }
 
         #[cfg(not(all(
@@ -348,7 +348,7 @@ impl TraceSession {
             let pid = self.traced_pid.ok_or(PtraceHookError::InvalidLifecycle(
                 "session has no traced pid",
             ))?;
-            return read_bytes_x86_64(pid, remote_addr, len);
+            read_bytes_x86_64(pid, remote_addr, len)
         }
 
         #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
@@ -366,7 +366,7 @@ impl TraceSession {
             let pid = self.traced_pid.ok_or(PtraceHookError::InvalidLifecycle(
                 "session has no traced pid",
             ))?;
-            return write_bytes_x86_64(pid, remote_addr, data);
+            write_bytes_x86_64(pid, remote_addr, data)
         }
 
         #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
@@ -385,7 +385,7 @@ impl TraceSession {
                 "session has no traced pid",
             ))?;
             let raw = ptrace_getregs_x86_64(pid)?;
-            return Ok(RegistersX86_64::from(raw));
+            Ok(RegistersX86_64::from(raw))
         }
 
         #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
@@ -404,7 +404,7 @@ impl TraceSession {
             ))?;
             let mut raw = ptrace_getregs_x86_64(pid)?;
             apply_registers_x86_64(&mut raw, regs);
-            return ptrace_setregs_x86_64(pid, &raw);
+            ptrace_setregs_x86_64(pid, &raw)
         }
 
         #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
@@ -827,7 +827,7 @@ fn wait_for_specific_pid_x86_64(pid: Pid) -> Result<WaitStatus, PtraceHookError>
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn spawn_tracee_x86_64(path: &PathBuf, args: &[OsString]) -> Result<Pid, PtraceHookError> {
+fn spawn_tracee_x86_64(path: &std::path::Path, args: &[OsString]) -> Result<Pid, PtraceHookError> {
     let path_bytes = path.as_os_str().as_bytes();
     if path_bytes.is_empty() {
         return Err(PtraceHookError::BuildError("spawn path is empty"));
